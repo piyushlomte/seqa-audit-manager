@@ -4,7 +4,7 @@ import { calculateAuditScore } from '../utils/auditEngine';
 
 const AuditContext = createContext();
 
-const LOCAL_STORAGE_KEY = 'SEQA_AUDIT_MANAGER_DATA_V2';
+const LOCAL_STORAGE_KEY = 'SEQA_AUDIT_MANAGER_DATA_V3';
 
 export const AuditProvider = ({ children }) => {
   const [data, setData] = useState(() => {
@@ -21,7 +21,7 @@ export const AuditProvider = ({ children }) => {
       templates: INITIAL_TEMPLATES,
       audits: INITIAL_AUDITS,
       capTickets: INITIAL_CAP_TICKETS,
-      darkMode: true
+      darkMode: false // Default to Light Mode
     };
   });
 
@@ -282,7 +282,7 @@ export const AuditProvider = ({ children }) => {
       templates: INITIAL_TEMPLATES,
       audits: INITIAL_AUDITS,
       capTickets: INITIAL_CAP_TICKETS,
-      darkMode: true
+      darkMode: false
     });
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     showToast('Cleared all data. Ready for fresh project setup.');
