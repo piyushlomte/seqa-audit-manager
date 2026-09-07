@@ -4,11 +4,16 @@ import { calculateAuditScore } from '../utils/auditEngine';
 
 const AuditContext = createContext();
 
-const LOCAL_STORAGE_KEY = 'SEQA_AUDIT_MANAGER_DATA_V3';
+const LOCAL_STORAGE_KEY = 'SEQA_AUDIT_MANAGER_DATA_V4';
 
 export const AuditProvider = ({ children }) => {
   const [data, setData] = useState(() => {
     try {
+      // Clear older version caches
+      localStorage.removeItem('SEQA_AUDIT_MANAGER_DATA_V1');
+      localStorage.removeItem('SEQA_AUDIT_MANAGER_DATA_V2');
+      localStorage.removeItem('SEQA_AUDIT_MANAGER_DATA_V3');
+
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         return JSON.parse(saved);
@@ -21,7 +26,7 @@ export const AuditProvider = ({ children }) => {
       templates: INITIAL_TEMPLATES,
       audits: INITIAL_AUDITS,
       capTickets: INITIAL_CAP_TICKETS,
-      darkMode: false // Default to Light Mode
+      darkMode: false // Light Mode default
     };
   });
 
