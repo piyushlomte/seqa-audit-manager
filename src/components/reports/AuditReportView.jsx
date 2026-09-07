@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAudit } from '../../context/AuditContext';
 import { calculateAuditScore } from '../../utils/auditEngine';
 import { QA_CATEGORIES } from '../../data/initialData';
@@ -6,7 +6,9 @@ import {
   FileText, 
   Printer, 
   Download, 
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 
@@ -18,10 +20,12 @@ export default function AuditReportView() {
     projects, 
     templates, 
     capTickets,
-    setActiveView 
+    setActiveView,
+    showToast
   } = useAudit();
 
   const reportRef = useRef();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const currentAudit = audits.find(a => a.id === activeReportAuditId) || audits[0];
   const template = templates.find(t => t.id === currentAudit?.templateId) || templates[0];
@@ -30,26 +34,51 @@ export default function AuditReportView() {
   const calc = currentAudit ? calculateAuditScore(template?.items || [], currentAudit.itemResults) : null;
   const auditCapTickets = capTickets.filter(c => c.auditId === currentAudit?.id);
 
-  const handleDownloadPDF = () => {
-    if (!reportRef.current) return;
-    const element = reportRef.current;
-    const opt = {
-      margin: 10,
-      filename: `Audit_Report_${project?.code || 'SEQA'}_${currentAudit?.milestoneName.replace(/\s+/g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(element).save();
+  const handleDownloadPDF = async () => {
+    if (!reportRef.current) {
+      showToast('Report content not loaded.', 'error');
+      return;
+    }
+    setIsGenerating(true);
+    showToast('Generating PDF executive report...', 'info');
+
+    try {
+      const element = reportRef.current;
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Audit_Report_${project?.code || 'SEQA'}_${currentAudit?.milestoneName ? currentAudit.milestoneName.replace(/\s+/g, '_') : 'Milestone'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      const pdfRunner = typeof html2pdf === 'function' ? html2pdf : html2pdf.default;
+      if (pdfRunner) {
+        await pdfRunner().set(opt).from(element).save();
+        showToast('PDF Report downloaded successfully.');
+      } else {
+        window.print();
+      }
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showToast('Opening print dialog fallback...', 'info');
+      window.print();
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handlePrint = () => {
-    window.print();
+    showToast('Opening print dialog...', 'info');
+    setTimeout(() => {
+      window.print();
+    }, 200);
   };
 
   return (
     <div className="space-y-6">
       
+      {/* Top Action Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm no-print">
         <div className="flex items-center space-x-3">
           <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -68,7 +97,7 @@ export default function AuditReportView() {
             <select
               value={currentAudit?.id}
               onChange={e => setActiveReportAuditId(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+              className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
             >
               {audits.map(a => (
                 <option key={a.id} value={a.id}>
@@ -79,15 +108,16 @@ export default function AuditReportView() {
 
             <button
               onClick={handleDownloadPDF}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm transition-all"
+              disabled={isGenerating}
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 text-white font-semibold text-xs shadow-sm transition-all"
             >
               <Download className="w-4 h-4" />
-              <span>Download PDF</span>
+              <span>{isGenerating ? 'Generating PDF...' : 'Download PDF'}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-all"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-all border border-slate-200 dark:border-slate-700"
             >
               <Printer className="w-4 h-4" />
               <span>Print Report</span>
@@ -96,6 +126,7 @@ export default function AuditReportView() {
         )}
       </div>
 
+      {/* Empty State */}
       {audits.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto">
@@ -123,6 +154,7 @@ export default function AuditReportView() {
             className="bg-white text-slate-900 p-8 sm:p-12 rounded-2xl border border-slate-200 shadow-xl space-y-8 print-container max-w-4xl mx-auto"
           >
             
+            {/* Header */}
             <div className="flex items-start justify-between border-b pb-6 border-slate-200">
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
@@ -141,15 +173,16 @@ export default function AuditReportView() {
                   VERDICT: {calc?.verdictLabel}
                 </span>
                 <span className="block text-[11px] text-slate-400 mt-1">
-                  Date: {new Date().toLocaleDateString()}
+                  Date: {currentAudit.auditDate || new Date().toLocaleDateString()}
                 </span>
               </div>
             </div>
 
+            {/* Metadata Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
               <div>
                 <span className="text-slate-400 font-medium block">Project</span>
-                <span className="font-bold text-slate-900">{project?.name} ({project?.code})</span>
+                <span className="font-bold text-slate-900">{project?.name || 'Project'} ({project?.code || 'PROJ'})</span>
               </div>
               <div>
                 <span className="text-slate-400 font-medium block">Milestone Gate</span>
@@ -161,10 +194,11 @@ export default function AuditReportView() {
               </div>
               <div>
                 <span className="text-slate-400 font-medium block">Project Manager</span>
-                <span className="font-bold text-slate-900">{project?.projectManager}</span>
+                <span className="font-bold text-slate-900">{project?.projectManager || 'Manager'}</span>
               </div>
             </div>
 
+            {/* Overall Compliance Score Banner */}
             <div className="flex items-center justify-between p-6 rounded-2xl bg-slate-900 text-white shadow-sm">
               <div>
                 <span className="text-xs font-semibold text-blue-400 uppercase">
@@ -196,6 +230,7 @@ export default function AuditReportView() {
               </div>
             </div>
 
+            {/* Category Scores */}
             <div className="space-y-3">
               <h4 className="font-bold text-sm text-slate-900 border-b pb-2">
                 1. Category Compliance Summary
@@ -229,13 +264,14 @@ export default function AuditReportView() {
               </table>
             </div>
 
+            {/* CAP Action Items */}
             <div className="space-y-3">
               <h4 className="font-bold text-sm text-slate-900 border-b pb-2">
                 2. Non-Conformance Corrective Action Plan (CAP)
               </h4>
 
               {auditCapTickets.length === 0 ? (
-                <p className="text-xs text-slate-500 italic p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-500 italic p-3 bg-slate-50 rounded-lg border border-slate-200">
                   No non-conformance items identified during this milestone audit. All evaluated criteria passed.
                 </p>
               ) : (
@@ -264,6 +300,7 @@ export default function AuditReportView() {
               )}
             </div>
 
+            {/* Signatures */}
             <div className="pt-8 border-t border-slate-300 grid grid-cols-2 gap-8 text-xs">
               <div className="space-y-6">
                 <span className="font-bold text-slate-900 block">Lead QA Auditor Authorization</span>
@@ -276,7 +313,7 @@ export default function AuditReportView() {
               <div className="space-y-6">
                 <span className="font-bold text-slate-900 block">Project Manager Milestone Sign-off</span>
                 <div className="border-b border-slate-400 w-48 pb-1">
-                  <span className="font-semibold text-slate-800 italic">{project?.projectManager}</span>
+                  <span className="font-semibold text-slate-800 italic">{project?.projectManager || 'Project Manager'}</span>
                 </div>
                 <span className="text-[11px] text-slate-400 block">Signature & Date</span>
               </div>
